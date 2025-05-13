@@ -1,19 +1,20 @@
 pipeline {
-    agent {
-        docker { 
-            image 'python:3.10'
-        }
-    }
+    agent any
 
     stages {
         stage('Install Dependencies') {
             steps {
-                sh 'pip install -r requirements.txt'
+                script {
+                    // Gunakan Docker dari host untuk menjalankan Python
+                    sh 'docker run --rm -v $(pwd):/app -w /app python:3.10 pip install -r requirements.txt'
+                }
             }
         }
         stage('Run Tests') {
             steps {
-                sh 'pytest test_app.py'
+                script {
+                    sh 'docker run --rm -v $(pwd):/app -w /app python:3.10 pytest test_app.py'
+                }
             }
         }
         stage('Deploy') {

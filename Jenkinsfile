@@ -1,22 +1,38 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_IMAGE = 'python:3.10'
+    }
+
     stages {
+        stage('Check Docker') {
+            steps {
+                script {
+                    // Memastikan Docker tersedia
+                    sh 'docker --version || (echo "Docker is not installed!" && exit 1)'
+                }
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 script {
-                    // Gunakan Docker dari host untuk menjalankan Python
-                    sh 'docker run --rm -v $(pwd):/app -w /app python:3.10 pip install -r requirements.txt'
+                    // Menggunakan Docker untuk install dependencies
+                    sh "docker run --rm -v \$(pwd):/app -w /app ${DOCKER_IMAGE} pip install -r requirements.txt"
                 }
             }
         }
+
         stage('Run Tests') {
             steps {
                 script {
-                    sh 'docker run --rm -v $(pwd):/app -w /app python:3.10 pytest test_app.py'
+                    // Menjalankan test dengan Docker
+                    sh "docker run --rm -v \$(pwd):/app -w /app ${DOCKER_IMAGE} pytest test_app.py"
                 }
             }
         }
+
         stage('Deploy') {
             when {
                 anyOf {
@@ -31,23 +47,10 @@ pipeline {
     }
 
     post {
-        success {
+        always {
             script {
                 def payload = [
-                    content: "✅ Build SUCCESS on `${env.BRANCH_NAME}`\nURL: ${env.BUILD_URL}"
-                ]
-                httpRequest(
-                    httpMode: 'POST',
-                    contentType: 'APPLICATION_JSON',
-                    requestBody: groovy.json.JsonOutput.toJson(payload),
-                    url: 'https://discord.com/api/webhooks/1371867088154787982/bcbA9YEBOmOba1_Qc1Ih6xswtBGNoXzEeVfeSXCN2xjM_Z4pb-VRI-Omav2ufTVOf5VP'
-                )
-            }
-        }
-        failure {
-            script {
-                def payload = [
-                    content: "❌ Build FAILED on `${env.BRANCH_NAME}`\nURL: ${env.BUILD_URL}"
+                    content: "${currentBuild.result == 'SUCCESS' ? '✅' : '❌'} Build ${currentBuild.result} on `${env.BRANCH_NAME}`\nURL: ${env.BUILD_URL}"
                 ]
                 httpRequest(
                     httpMode: 'POST',
